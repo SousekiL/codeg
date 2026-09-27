@@ -17,7 +17,16 @@ import { getAgentLabel } from "@/lib/custom-agents"
 import type { AgentQuotaInfo } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
-const SUPPORTED_AGENTS = new Set(["codex", "antigravity"])
+// Agents with a quota probe on the backend (`src-tauri/src/quota/`). Devin
+// appears twice: the built-in id and the wire id of a user-registered custom
+// ACP agent named `devin` are the same account.
+const SUPPORTED_AGENTS = new Set([
+  "codex",
+  "antigravity",
+  "claude_code",
+  "devin",
+  "custom:devin",
+])
 
 const quotaCache = new Map<
   string,
