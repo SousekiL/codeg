@@ -461,6 +461,26 @@ const CursorMonoIcon = memo(function CursorMonoIcon({
   )
 })
 
+const DevinMonoIcon = memo(function DevinMonoIcon({ size = "1em" }: IconProps) {
+  // Devin has no glyph in the ACP registry and codeg bundles no brand asset
+  // for it (it is import-only), so this is a plain monochrome "D" mark in
+  // currentColor, frameless like the other mono marks.
+  return (
+    <svg
+      fill="currentColor"
+      fillRule="evenodd"
+      height={size}
+      style={baseSvgStyle}
+      viewBox="0 0 24 24"
+      width={size}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <title>Devin</title>
+      <path d="M5 3h6.5a9 9 0 0 1 0 18H5V3zm4 4v10h2.5a5 5 0 0 0 0-10H9z" />
+    </svg>
+  )
+})
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyIcon = React.ComponentType<any>
 
@@ -483,6 +503,7 @@ const MONO_ICONS: Partial<Record<AgentType, AnyIcon>> = {
   cursor: CursorMonoIcon,
   qoder: QoderMonoIcon,
   antigravity: AntigravityMonoIcon,
+  devin: DevinMonoIcon,
 }
 
 // Per-agent color override for mono marks, layered on top of the default
