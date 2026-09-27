@@ -1,7 +1,9 @@
 //! Quota and rate-limit manager for AI coding agents.
 
 pub mod antigravity;
+pub mod claude;
 pub mod codex;
+pub mod devin;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -88,8 +90,14 @@ impl QuotaManager {
         let info = match agent_type {
             "codex" => self.fetch_codex_quota().await?,
             "antigravity" => self.fetch_antigravity_quota().await?,
+            claude::CLAUDE_AGENT_TYPE => claude::fetch_claude_quota().await?,
+            // Devin is the same account whether it runs as the built-in
+            // (import-only) agent or the user's custom ACP registration.
+            t if devin::DEVIN_AGENT_TYPES.contains(&t) => devin::fetch_devin_quota(t).await?,
             other => {
-                return Err(format!("Quota fetching not implemented for agent '{other}'"));
+                return Err(format!(
+                    "Quota fetching not implemented for agent '{other}'"
+                ));
             }
         };
 
