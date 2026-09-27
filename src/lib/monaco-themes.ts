@@ -32,6 +32,7 @@ export const EDITOR_CANVAS_BG: Record<
   blue: { light: "#fcfdff", dark: "#14171e" },
   yellow: { light: "#fefdfa", dark: "#1a1710" },
   violet: { light: "#fdfdff", dark: "#17161d" },
+  aionui: { light: "#ffffff", dark: "#1a1a1a" },
 }
 
 // Current-line highlight per theme color = that theme's `--muted` token (see the
@@ -56,6 +57,7 @@ export const EDITOR_LINE_HIGHLIGHT: Record<
   blue: { light: "#eff4fd", dark: "#23282f" },
   yellow: { light: "#f8f4eb", dark: "#2b271f" },
   violet: { light: "#f4f3fc", dark: "#27262f" },
+  aionui: { light: "#f2f3f5", dark: "#262626" },
 }
 
 // A Monaco theme name encodes both axes: light/dark mode and the active theme color.
