@@ -155,7 +155,7 @@ describe("ComposerQuotaBadge", () => {
     })
   })
 
-  it("fetches quota for Claude Code and shows the 5-hour window", async () => {
+  it("fetches quota for Claude Code and shows its binding (weekly) window", async () => {
     const claudeQuota: AgentQuotaInfo = {
       agentType: "claude_code",
       planName: "Claude Max",
@@ -178,7 +178,7 @@ describe("ComposerQuotaBadge", () => {
     expect(mockGetAgentQuota).toHaveBeenCalledWith("claude_code")
     await waitFor(() => {
       expect(screen.getByLabelText("View quota status")).toHaveTextContent(
-        "5h: 77%"
+        "7d: 39%"
       )
     })
   })
@@ -201,7 +201,31 @@ describe("ComposerQuotaBadge", () => {
     expect(mockGetAgentQuota).toHaveBeenCalledWith("custom:devin")
     await waitFor(() => {
       expect(screen.getByLabelText("View quota status")).toHaveTextContent(
-        "Daily: 43%"
+        "1d: 43%"
+      )
+    })
+  })
+
+  it("shows the weekly window when it, not the 5-hour one, is binding", async () => {
+    mockGetAgentQuota.mockResolvedValueOnce({
+      agentType: "codex",
+      planName: "Pro Plan",
+      shortWindow: {
+        label: "5-Hour Window",
+        usedPercent: 0,
+        remainingPercent: 100,
+      },
+      weeklyWindow: {
+        label: "Weekly Limit",
+        usedPercent: 64,
+        remainingPercent: 36,
+      },
+      lastUpdated: "2026-09-27T12:00:00Z",
+    } satisfies AgentQuotaInfo)
+    renderBadge("codex")
+    await waitFor(() => {
+      expect(screen.getByLabelText("View quota status")).toHaveTextContent(
+        "7d: 36%"
       )
     })
   })
@@ -212,7 +236,7 @@ describe("ComposerQuotaBadge", () => {
 
     await waitFor(() => {
       const button = screen.getByLabelText("View quota status")
-      expect(button).toHaveTextContent("5h: 15%")
+      expect(button).toHaveTextContent("7d: 2%")
       expect(button.className).toContain("text-red-500")
     })
   })
