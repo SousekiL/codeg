@@ -950,6 +950,80 @@
   --sidebar-ring: oklch(0.541 0.281 293.009);
 }
 
+/* ── AionUi 预设 ─────────────────────────────────────────────────────────
+ * 参考 AionUi（iOfficeAI/AionUi）默认配色：紫灰品牌色 #7583b2、白底 +
+ * #f9fafb / #f2f3f5 的分层浅灰、#e5e6eb 细边框，整体柔和低对比；配合更大的
+ * 圆角（0.875rem）得到它那种"光滑"的观感。dark 侧取其 #0e0e0e / #1a1a1a /
+ * #262626 三层中性灰与提亮后的品牌色 #a1aacb。 */
+[data-theme="aionui"] {
+  --radius: 0.875rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.247 0.016 264.2);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.247 0.016 264.2);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.247 0.016 264.2);
+  --primary: oklch(0.617 0.073 271.3);
+  --primary-foreground: oklch(0.985 0.002 247.8);
+  --secondary: oklch(0.964 0.003 264.5);
+  --secondary-foreground: oklch(0.461 0.03 257.7);
+  --muted: oklch(0.964 0.003 264.5);
+  --muted-foreground: oklch(0.6 0.022 253);
+  --accent: oklch(0.956 0.008 278.6);
+  --accent-foreground: oklch(0.408 0.055 271.7);
+  --destructive: oklch(0.642 0.218 25.9);
+  --border: oklch(0.926 0.007 277.2);
+  --input: oklch(0.926 0.007 277.2);
+  --ring: oklch(0.617 0.073 271.3);
+  --chart-1: oklch(0.549 0.249 263);
+  --chart-2: oklch(0.617 0.073 271.3);
+  --chart-3: oklch(0.6 0.118 184.704);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0.002 247.8);
+  --sidebar-foreground: oklch(0.247 0.016 264.2);
+  --sidebar-primary: oklch(0.617 0.073 271.3);
+  --sidebar-primary-foreground: oklch(0.985 0.002 247.8);
+  --sidebar-accent: oklch(0.956 0.008 278.6);
+  --sidebar-accent-foreground: oklch(0.408 0.055 271.7);
+  --sidebar-border: oklch(0.926 0.007 277.2);
+  --sidebar-ring: oklch(0.617 0.073 271.3);
+}
+[data-theme="aionui"].dark {
+  --radius: 0.875rem;
+  --background: oklch(0.178 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.217 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.217 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.75 0.045 273);
+  --primary-foreground: oklch(0.176 0.025 272.8);
+  --secondary: oklch(0.27 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.27 0 0);
+  --muted-foreground: oklch(0.7 0.015 250);
+  --accent: oklch(0.32 0.012 273);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.75 0.045 273);
+  --chart-1: oklch(0.65 0.2 262);
+  --chart-2: oklch(0.75 0.045 273);
+  --chart-3: oklch(0.696 0.17 162.48);
+  --chart-4: oklch(0.769 0.188 70.08);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.217 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.75 0.045 273);
+  --sidebar-primary-foreground: oklch(0.176 0.025 272.8);
+  --sidebar-accent: oklch(0.27 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.75 0.045 273);
+}
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]):not(.light) {
     --background: oklch(0.145 0 0);
