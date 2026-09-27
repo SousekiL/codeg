@@ -19,6 +19,7 @@ export const THEME_COLORS = [
   "blue",
   "yellow",
   "violet",
+  "aionui",
 ] as const
 
 export type ThemeColor = (typeof THEME_COLORS)[number]
@@ -88,6 +89,7 @@ export const THEME_COLOR_PREVIEW: Record<ThemeColor, string> = {
   blue: "oklch(0.546 0.245 262.881)",
   yellow: "oklch(0.795 0.184 86.047)",
   violet: "oklch(0.606 0.25 292.717)",
+  aionui: "oklch(0.617 0.073 271.3)",
 }
 
 /**
@@ -135,6 +137,9 @@ export const THEME_COLOR_TITLE: Record<
     light: "oklch(0.5 0.25 292.717)",
     dark: "oklch(0.8 0.111 293.009)",
   },
+  // AionUi 紫灰品牌色：light 取 aou-7（#596590，侧边栏底 0.985 上约 6.5:1），
+  // dark 取提亮后的品牌色。
+  aionui: { light: "oklch(0.515 0.07 271.8)", dark: "oklch(0.85 0.035 273)" },
 }
 
 /**
