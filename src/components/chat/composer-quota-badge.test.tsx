@@ -159,6 +159,57 @@ describe("ComposerQuotaBadge", () => {
     })
   })
 
+  it("fetches quota for Claude Code and shows its binding (weekly) window", async () => {
+    const claudeQuota: AgentQuotaInfo = {
+      agentType: "claude_code",
+      planName: "Claude Max",
+      shortWindow: {
+        label: "5-Hour Window",
+        usedPercent: 23,
+        remainingPercent: 77,
+        resetInSeconds: 10800,
+      },
+      weeklyWindow: {
+        label: "Weekly Limit",
+        usedPercent: 61.5,
+        remainingPercent: 38.5,
+      },
+      lastUpdated: "2026-09-27T12:00:00Z",
+    }
+    mockGetAgentQuota.mockResolvedValueOnce(claudeQuota)
+    renderBadge("claude_code")
+
+    expect(mockGetAgentQuota).toHaveBeenCalledWith("claude_code")
+    await waitFor(() => {
+      expect(screen.getByLabelText("View quota status")).toHaveTextContent(
+        "7d: 39%"
+      )
+    })
+  })
+
+  it("treats the custom Devin agent as quota-capable and shows its daily window", async () => {
+    const devinQuota: AgentQuotaInfo = {
+      agentType: "custom:devin",
+      planName: "Devin Pro · 12.2 / 150 ACU",
+      shortWindow: {
+        label: "Daily Quota",
+        usedPercent: 57.5,
+        remainingPercent: 42.5,
+        resetInSeconds: 7200,
+      },
+      lastUpdated: "2026-09-27T12:00:00Z",
+    }
+    mockGetAgentQuota.mockResolvedValueOnce(devinQuota)
+    renderBadge("custom:devin")
+
+    expect(mockGetAgentQuota).toHaveBeenCalledWith("custom:devin")
+    await waitFor(() => {
+      expect(screen.getByLabelText("View quota status")).toHaveTextContent(
+        "1d: 43%"
+      )
+    })
+  })
+
   it("renders low quota warning styling when remaining is low", async () => {
     mockGetAgentQuota.mockResolvedValueOnce(sampleLowQuota)
     renderBadge("codex")
