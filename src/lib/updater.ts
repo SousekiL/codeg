@@ -129,6 +129,17 @@ export function subscribeAppUpdateState(
  * download runs detached in the backend, so it is not bound to this call's
  * lifetime. */
 export function startAppUpdate(): Promise<AppUpdateState> {
+  // Personal build (see ~/.local/bin/codeg-sync): installing the official
+  // release in place would drop the locally added features. The check still
+  // runs, so the new version is announced; the upgrade goes through the sync
+  // script instead, which rebuilds on the new release and re-applies them.
+  if (process.env.NEXT_PUBLIC_CODEG_PERSONAL_BUILD === "1") {
+    return Promise.reject(
+      new Error(
+        "这是自用版：直接安装官方更新会丢掉你的改动。请在终端运行 ~/.local/bin/codeg-sync 升级（会自动检查并补回你的功能）。"
+      )
+    )
+  }
   return getTransport().call<AppUpdateState>("perform_app_update")
 }
 
