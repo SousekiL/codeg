@@ -31,6 +31,11 @@ import {
   type UserResourceDisplay,
 } from "@/lib/adapters/ai-elements-adapter"
 import { TurnStats } from "./turn-stats"
+import {
+  PinMessageButton,
+  PinnedMessagesProvider,
+  PinnedMessagesRail,
+} from "./pinned-messages"
 import { LiveTurnStats } from "./live-turn-stats"
 import { ModelLabelProvider } from "./model-label-context"
 import { ReplyArtifacts } from "./reply-artifacts"
@@ -958,6 +963,11 @@ const HistoricalMessageGroup = memo(function HistoricalMessageGroup({
         ) : null}
         {group.role === "user" ? (
           <div className="group/user-msg flex w-fit ml-auto max-w-full items-start gap-1">
+            <PinMessageButton
+              messageId={group.id}
+              text={extractTextFromParts(group.parts)}
+              variant="user"
+            />
             <UserMessageTaskButton parts={group.parts} />
             <UserMessageCopyButton parts={group.parts} />
             <MessageContent>
@@ -997,6 +1007,13 @@ const HistoricalMessageGroup = memo(function HistoricalMessageGroup({
           isResponseComplete={isResponseComplete}
           copyText={extractTextFromParts(group.parts)}
           completedAt={group.completed_at}
+          extraActions={
+            <PinMessageButton
+              messageId={group.id}
+              text={extractTextFromParts(group.parts)}
+              variant="reply"
+            />
+          }
           forkDisabled={forkDisabled || forkPointUnnamed}
           forkDisabledReason={forkPointUnnamed ? "unnamed" : "busy"}
           onForkFromHere={
@@ -1727,6 +1744,11 @@ export function MessageListView({
             overlayKey={subAgentOverlayKey}
           />
         </div>
+        <PinnedMessagesRail
+          conversationId={conversationId}
+          items={threadItems}
+          scrollApiRef={scrollApiRef}
+        />
         <SelectionActionBubble
           containerRef={selectionBoxRef}
           onQuote={onQuoteSelection}
@@ -1741,7 +1763,11 @@ export function MessageListView({
     <MarkdownImageProvider
       rootPath={imageRoot === undefined ? storedImageRoot : imageRoot}
     >
-      <ModelLabelProvider value={modelLabel}>{thread}</ModelLabelProvider>
+      <ModelLabelProvider value={modelLabel}>
+        <PinnedMessagesProvider conversationId={conversationId}>
+          {thread}
+        </PinnedMessagesProvider>
+      </ModelLabelProvider>
     </MarkdownImageProvider>
   )
 }
