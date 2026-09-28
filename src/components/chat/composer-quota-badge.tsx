@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/popover"
 import { getAgentQuota, refreshAgentQuota } from "@/lib/api"
 import { getAgentLabel } from "@/lib/custom-agents"
-import type { AgentQuotaInfo } from "@/lib/types"
+import type { AgentQuotaInfo, QuotaWindow } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 const SUPPORTED_AGENTS = new Set(["codex", "antigravity"])
@@ -91,6 +91,18 @@ function formatCountdown(
   return t("resetsIn", { time: timeStr })
 }
 
+/** The window with the least remaining — the one that will run out first. */
+export function pickBindingWindow(
+  quota: AgentQuotaInfo | null | undefined
+): QuotaWindow | null {
+  const short = quota?.shortWindow ?? null
+  const weekly = quota?.weeklyWindow ?? null
+  if (short && weekly) {
+    return weekly.remainingPercent < short.remainingPercent ? weekly : short
+  }
+  return short ?? weekly
+}
+
 function getShortWindowLabel(rawLabel: string): string {
   const lower = rawLabel.toLowerCase()
   if (
@@ -101,6 +113,8 @@ function getShortWindowLabel(rawLabel: string): string {
     return "5h"
   if (lower.includes("week") || lower.includes("7d") || lower.includes("周"))
     return "7d"
+  if (lower.includes("daily") || lower.includes("day") || lower.includes("日"))
+    return "1d"
   if (rawLabel.length > 6) return rawLabel.slice(0, 5)
   return rawLabel
 }
@@ -254,11 +268,15 @@ export function ComposerQuotaBadge({ tabId }: { tabId: string | null }) {
 
   const agentLabel = getAgentLabel(agentType)
 
+  // Show whichever window is actually binding — the one with less left. A
+  // plan whose short window never bites (e.g. ChatGPT Pro, whose 5-hour window
+  // sits near 100% while the weekly one drains) should read its weekly figure,
+  // not a reassuring but irrelevant 5h number. Ties keep the short window.
+  const bindingWindow = pickBindingWindow(quota)
+
   let shortText = ""
-  if (quota?.shortWindow) {
-    shortText = `${getShortWindowLabel(quota.shortWindow.label)}: ${Math.round(quota.shortWindow.remainingPercent)}%`
-  } else if (quota?.weeklyWindow) {
-    shortText = `${getShortWindowLabel(quota.weeklyWindow.label)}: ${Math.round(quota.weeklyWindow.remainingPercent)}%`
+  if (bindingWindow) {
+    shortText = `${getShortWindowLabel(bindingWindow.label)}: ${Math.round(bindingWindow.remainingPercent)}%`
   } else if (quota?.planName) {
     shortText = quota.planName
   } else {
