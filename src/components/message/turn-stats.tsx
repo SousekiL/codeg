@@ -1,6 +1,13 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react"
 import {
   ArrowUpToLine,
   BrainCog,
@@ -46,6 +53,8 @@ interface TurnStatsProps {
    * name the backend can resolve yet (`unnamed` — the post-turn reparse fills
    * it in a moment later). Only read while `forkDisabled`. */
   forkDisabledReason?: "busy" | "unnamed"
+  /** Extra buttons appended to the action row (personal: pin message). */
+  extraActions?: ReactNode
 }
 
 const iconButtonClass =
@@ -63,6 +72,7 @@ export function TurnStats({
   onForkFromHere,
   forkDisabled = false,
   forkDisabledReason = "busy",
+  extraActions,
 }: TurnStatsProps) {
   const locale = useLocale()
   const t = useTranslations("Folder.chat.messageList")
@@ -241,6 +251,7 @@ export function TurnStats({
             </TooltipContent>
           </Tooltip>
         )}
+        {extraActions}
         {displayModels.length > 0 && (
           <Tooltip>
             <TooltipTrigger asChild>
