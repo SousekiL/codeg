@@ -29,7 +29,11 @@ vi.mock("@/lib/api", () => ({
   refreshAgentQuota: vi.fn(),
 }))
 
-import { ComposerQuotaBadge, resetQuotaCache } from "./composer-quota-badge"
+import {
+  ComposerQuotaBadge,
+  pickBindingWindow,
+  resetQuotaCache,
+} from "./composer-quota-badge"
 import { useTabStore } from "@/contexts/tab-context"
 import { getAgentQuota, refreshAgentQuota } from "@/lib/api"
 
@@ -108,7 +112,7 @@ describe("ComposerQuotaBadge", () => {
   })
 
   it("renders null for unsupported agent types", () => {
-    renderBadge("claude_code")
+    renderBadge("unsupported_agent")
     expect(screen.queryByLabelText("View quota status")).toBeNull()
     expect(mockGetAgentQuota).not.toHaveBeenCalled()
   })
@@ -161,8 +165,34 @@ describe("ComposerQuotaBadge", () => {
 
     await waitFor(() => {
       const button = screen.getByLabelText("View quota status")
-      expect(button).toHaveTextContent("5h: 15%")
+      // In sampleLowQuota, weeklyWindow (2%) has less remaining than shortWindow (15%),
+      // so binding window selection renders weekly window (7d: 2%)
+      expect(button).toHaveTextContent("7d: 2%")
       expect(button.className).toContain("text-red-500")
+    })
+  })
+
+  it("shows the weekly window when it, not the 5-hour one, is binding", async () => {
+    mockGetAgentQuota.mockResolvedValueOnce({
+      agentType: "codex",
+      planName: "Pro Plan",
+      shortWindow: {
+        label: "5-Hour Window",
+        usedPercent: 0,
+        remainingPercent: 100,
+      },
+      weeklyWindow: {
+        label: "Weekly Limit",
+        usedPercent: 64,
+        remainingPercent: 36,
+      },
+      lastUpdated: "2026-09-27T12:00:00Z",
+    } satisfies AgentQuotaInfo)
+    renderBadge("codex")
+    await waitFor(() => {
+      expect(screen.getByLabelText("View quota status")).toHaveTextContent(
+        "7d: 36%"
+      )
     })
   })
 
@@ -221,5 +251,63 @@ describe("ComposerQuotaBadge", () => {
         "5h: 75%"
       )
     })
+  })
+})
+
+describe("pickBindingWindow", () => {
+  it("returns null when quota is null or has no windows", () => {
+    expect(pickBindingWindow(null)).toBeNull()
+    expect(
+      pickBindingWindow({
+        agentType: "test",
+        lastUpdated: "2026-09-28T00:00:00Z",
+      })
+    ).toBeNull()
+  })
+
+  it("returns shortWindow when weeklyWindow is absent", () => {
+    const quota: AgentQuotaInfo = {
+      agentType: "test",
+      shortWindow: { label: "5h", usedPercent: 10, remainingPercent: 90 },
+      lastUpdated: "2026-09-28T00:00:00Z",
+    }
+    expect(pickBindingWindow(quota)).toEqual(quota.shortWindow)
+  })
+
+  it("returns weeklyWindow when shortWindow is absent", () => {
+    const quota: AgentQuotaInfo = {
+      agentType: "test",
+      weeklyWindow: { label: "7d", usedPercent: 20, remainingPercent: 80 },
+      lastUpdated: "2026-09-28T00:00:00Z",
+    }
+    expect(pickBindingWindow(quota)).toEqual(quota.weeklyWindow)
+  })
+
+  it("picks the window with less remaining percentage", () => {
+    const shortTighter: AgentQuotaInfo = {
+      agentType: "test",
+      shortWindow: { label: "5h", usedPercent: 60, remainingPercent: 40 },
+      weeklyWindow: { label: "7d", usedPercent: 20, remainingPercent: 80 },
+      lastUpdated: "2026-09-28T00:00:00Z",
+    }
+    expect(pickBindingWindow(shortTighter)).toEqual(shortTighter.shortWindow)
+
+    const weeklyTighter: AgentQuotaInfo = {
+      agentType: "test",
+      shortWindow: { label: "5h", usedPercent: 10, remainingPercent: 90 },
+      weeklyWindow: { label: "7d", usedPercent: 70, remainingPercent: 30 },
+      lastUpdated: "2026-09-28T00:00:00Z",
+    }
+    expect(pickBindingWindow(weeklyTighter)).toEqual(weeklyTighter.weeklyWindow)
+  })
+
+  it("breaks ties in favor of the short window", () => {
+    const tied: AgentQuotaInfo = {
+      agentType: "test",
+      shortWindow: { label: "5h", usedPercent: 50, remainingPercent: 50 },
+      weeklyWindow: { label: "7d", usedPercent: 50, remainingPercent: 50 },
+      lastUpdated: "2026-09-28T00:00:00Z",
+    }
+    expect(pickBindingWindow(tied)).toEqual(tied.shortWindow)
   })
 })
