@@ -20,6 +20,7 @@ pub const CLAUDE_AGENT_TYPE: &str = "claude_code";
 const USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
 /// The beta header Claude Code sends on every OAuth-authenticated request.
 const OAUTH_BETA_HEADER: &str = "oauth-2025-04-20";
+#[cfg(target_os = "macos")]
 const KEYCHAIN_SERVICE: &str = "Claude Code-credentials";
 
 #[derive(Debug, Deserialize)]
