@@ -2433,7 +2433,14 @@ export function MessageInput({
                 slot, which would inset the narrow icon and break the alignment. */}
             <div className="flex shrink-0 items-center gap-3 pr-px">
               <ComposerQuotaBadge tabId={attachmentTabId ?? null} />
-              <ComposerContextUsage tabId={attachmentTabId ?? null} />
+              <ComposerContextUsage
+                tabId={attachmentTabId ?? null}
+                part="tokens"
+              />
+              <ComposerContextUsage
+                tabId={attachmentTabId ?? null}
+                part="context"
+              />
               <ComposerConnectionStatus tabId={attachmentTabId ?? null} />
             </div>
           </div>
