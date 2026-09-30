@@ -109,3 +109,20 @@ svg.lucide[stroke-width="2"] {
 [data-panel-id="folder-shell-left-panel"] .border-b.ws-chrome-border {
   border-bottom-color: transparent;
 }
+
+/* Splitters: no thick bar on hover; the resize cursor is the affordance.
+   While actually dragging, a plain 1px line shows where the edge is. */
+[data-panel-group-id="folder-shell-group"] > [data-resize-handle-state="hover"] {
+  --resize-handle-thickness: 1px;
+}
+[data-panel-group-id="folder-shell-group"]
+  > [data-resize-handle-state="hover"]::before {
+  background: transparent;
+}
+[data-panel-group-id="folder-shell-group"] > [data-resize-handle-state="drag"] {
+  --resize-handle-thickness: 1px;
+}
+[data-panel-group-id="folder-shell-group"]
+  > [data-resize-handle-state="drag"]::before {
+  background: var(--border);
+}
