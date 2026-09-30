@@ -1,0 +1,111 @@
+/*
+ * Personal UI polish — kept in this one file so upstream upgrades rarely
+ * conflict (the only upstream touch is its import in app/layout.tsx).
+ *
+ *  1. Regions by surface, not lines: the shell takes the sidebar tone, the
+ *     main column becomes an inset rounded panel, resting dividers go quiet.
+ *  2. Fewer radii: 2xl/3xl/4xl collapse to xl, sm to md.
+ *  3. Fewer type sizes: off-scale 10px → 11px, 13px → 14px.
+ *  4. Lighter icon strokes.
+ *  6. A composer that floats instead of being boxed in.
+ *
+ * Every rule is scoped to the desktop shell or to stable hooks
+ * (data-panel-id, component class names), and the background-image mode
+ * (`[data-workspace-bg="on"]`) keeps its own surfaces.
+ */
+
+/* ── 2. radius scale ─────────────────────────────────────────────────── */
+:root,
+[data-theme] {
+  --radius-sm: calc(var(--radius) * 0.8);
+  --radius-2xl: calc(var(--radius) * 1.4);
+  --radius-3xl: calc(var(--radius) * 1.4);
+  --radius-4xl: calc(var(--radius) * 1.4);
+}
+
+/* ── 3. type scale ───────────────────────────────────────────────────── */
+[class~="text-[0.625rem]"],
+[class~="text-3xs"] {
+  font-size: 0.6875rem;
+}
+[class~="text-[0.8125rem]"],
+[class~="text-[13px]"] {
+  font-size: 0.875rem;
+}
+
+/* ── 4. icon strokes ─────────────────────────────────────────────────── */
+/* Only icons still at lucide's default 2 — deliberate weights are kept. */
+svg.lucide[stroke-width="2"] {
+  stroke-width: 1.6;
+}
+
+/* ── 1. regions ──────────────────────────────────────────────────────── */
+[data-panel-group-id="folder-shell-group"] {
+  background: var(--sidebar);
+}
+/* Resting splitter lines disappear; the hover/drag affordance stays. */
+[data-panel-group-id="folder-shell-group"]
+  > [data-resize-handle-state="inactive"]::before {
+  background: transparent;
+}
+/* The main column: an inset panel, a hair above the shell. */
+[data-panel-id="folder-shell-main-panel"] {
+  padding: 6px 6px 6px 0;
+}
+[data-panel-id="folder-shell-main-panel"] > main {
+  border-radius: 12px;
+  background: var(--background);
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--foreground) 7%, transparent),
+    0 1px 2px color-mix(in oklch, var(--foreground) 4%, transparent);
+}
+[data-workspace-bg="on"] [data-panel-group-id="folder-shell-group"] {
+  background: transparent;
+}
+[data-workspace-bg="on"] [data-panel-id="folder-shell-main-panel"] > main {
+  background: transparent;
+}
+/* Rows inside the panel: conversation / file header and the terminal tab
+   strip no longer draw a full-width rule under themselves. */
+[data-panel-id="folder-shell-main-panel"] .h-10.border-b,
+[data-panel-id="folder-shell-main-panel"] .h-8.border-b {
+  border-bottom-color: transparent;
+}
+/* Status bar sits on the shell tone, no rule above it. */
+.h-8.border-t.ws-chrome-border.ws-surface-muted {
+  border-top-color: transparent;
+  background: var(--sidebar);
+}
+[data-workspace-bg="on"] .h-8.border-t.ws-chrome-border.ws-surface-muted {
+  background: transparent;
+}
+
+/* ── 6. composer ─────────────────────────────────────────────────────── */
+.codeg-composer-chrome {
+  border-color: color-mix(in oklch, var(--foreground) 11%, transparent);
+  box-shadow:
+    0 1px 2px color-mix(in oklch, var(--foreground) 4%, transparent),
+    0 6px 20px -8px color-mix(in oklch, var(--foreground) 12%, transparent);
+  transition:
+    border-color 150ms ease-out,
+    box-shadow 150ms ease-out;
+}
+.codeg-composer-chrome:focus-within {
+  border-color: color-mix(in oklch, var(--foreground) 24%, transparent);
+  --tw-ring-shadow: 0 0 #0000;
+  box-shadow:
+    0 0 0 3px color-mix(in oklch, var(--foreground) 6%, transparent),
+    0 6px 20px -8px color-mix(in oklch, var(--foreground) 14%, transparent);
+}
+
+/* ── 5. alignment ────────────────────────────────────────────────────── */
+/* The inset panel starts 6px down; its tab strip gives those 6px back so
+   the strip and the sidebar's top row share one baseline and one bottom
+   edge (both end 40px from the top). */
+[data-panel-id="folder-shell-main-panel"] .h-10.items-stretch.bg-muted {
+  height: calc(2.5rem - 6px);
+}
+/* The sidebar's top row: no rule under it either. */
+[data-panel-id="folder-shell-left-panel"] .border-b.ws-chrome-border {
+  border-bottom-color: transparent;
+}
