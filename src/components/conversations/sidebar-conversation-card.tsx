@@ -404,20 +404,22 @@ export const SidebarConversationCard = memo(function SidebarConversationCard({
                       )}
                       style={{
                         left: "var(--conv-rail-axis, 0.875rem)",
-                        width: "0.875rem",
-                        height: "0.875rem",
+                        width: "1rem",
+                        height: "1rem",
                         transform: "translate(-50%, -50%)",
                       }}
                       aria-hidden
                     >
+                      {/* Personal: a 16px agent icon with a small 5px status
+                          badge, so the icon — not the dot — carries the row. */}
                       <AgentIcon
                         agentType={conversation.agent_type}
-                        className="h-[0.75rem] w-[0.75rem]"
+                        className="h-[1rem] w-[1rem]"
                       />
                       <ConversationStatusDot
                         status={status}
                         size="sm"
-                        className="absolute -right-0.5 -bottom-0.5 ring-2 ring-sidebar"
+                        className="absolute -right-[2px] -bottom-[2px] h-[5px] w-[5px] ring-[1.5px] ring-sidebar"
                       />
                     </div>
 
