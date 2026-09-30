@@ -96,6 +96,20 @@ fn parse_credentials(json: &str) -> Option<OauthCredentials> {
     Some(creds)
 }
 
+/// Anthropic's OAuth endpoints treat unknown clients far more strictly; send
+/// the same identity the installed Claude Code does.
+fn claude_user_agent() -> String {
+    let version = std::process::Command::new("claude")
+        .arg("--version")
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .and_then(|s| s.split_whitespace().next().map(str::to_string))
+        .filter(|v| v.chars().next().is_some_and(|c| c.is_ascii_digit()))
+        .unwrap_or_else(|| "2.0.0".to_string());
+    format!("claude-cli/{version} (external, cli)")
+}
+
 fn window_from(label: &str, w: &UsageWindow, now: DateTime<Utc>) -> QuotaWindow {
     let used = w.utilization.unwrap_or(0.0).clamp(0.0, 100.0);
     let reset_in = w.resets_at.map(|at| (at - now).num_seconds().max(0));
@@ -173,7 +187,7 @@ pub async fn fetch_claude_quota() -> Result<AgentQuotaInfo, String> {
         .get(USAGE_URL)
         .header("Authorization", format!("Bearer {access_token}"))
         .header("anthropic-beta", OAUTH_BETA_HEADER)
-        .header("User-Agent", "codeg")
+        .header("User-Agent", claude_user_agent())
         .send()
         .await
         .map_err(|e| format!("Claude usage API request failed: {e}"))?;

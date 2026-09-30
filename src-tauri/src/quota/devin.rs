@@ -20,6 +20,14 @@ use crate::models::{AgentQuotaInfo, QuotaWindow};
 /// agent a user registers to run Devin live — both mean the same account.
 pub const DEVIN_AGENT_TYPES: &[&str] = &["devin", "custom:devin"];
 const DEFAULT_API_SERVER: &str = "https://server.codeium.com";
+/// `(ide_name, extension_name)` pairs tried in order; the first is what Devin
+/// CLI itself sends.
+const CLIENT_IDENTITIES: &[(&str, &str)] = &[
+    ("devin_cli", "chisel"),
+    ("chisel", "chisel"),
+    ("windsurf", "windsurf"),
+];
+const FALLBACK_CLI_VERSION: &str = "3000.0.0";
 const GET_USER_STATUS_PATH: &str = "/exa.seat_management_pb.SeatManagementService/GetUserStatus";
 
 #[derive(Debug, Deserialize)]
@@ -35,22 +43,41 @@ struct PlanInfo {
     plan_name: Option<String>,
 }
 
+/// protojson writes 64-bit integers as strings; accept either form.
+fn de_opt_num<'de, D, T>(d: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: std::str::FromStr + serde::Deserialize<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum NumOrStr<T> {
+        Num(T),
+        Str(String),
+    }
+    Ok(match Option::<NumOrStr<T>>::deserialize(d)? {
+        Some(NumOrStr::Num(n)) => Some(n),
+        Some(NumOrStr::Str(s)) => s.trim().parse().ok(),
+        None => None,
+    })
+}
+
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PlanStatus {
     #[serde(alias = "plan_info")]
     plan_info: Option<PlanInfo>,
-    #[serde(alias = "daily_quota_remaining_percent")]
+    #[serde(alias = "daily_quota_remaining_percent", default, deserialize_with = "de_opt_num")]
     daily_quota_remaining_percent: Option<f64>,
-    #[serde(alias = "weekly_quota_remaining_percent")]
+    #[serde(alias = "weekly_quota_remaining_percent", default, deserialize_with = "de_opt_num")]
     weekly_quota_remaining_percent: Option<f64>,
-    #[serde(alias = "daily_quota_reset_at_unix")]
+    #[serde(alias = "daily_quota_reset_at_unix", default, deserialize_with = "de_opt_num")]
     daily_quota_reset_at_unix: Option<i64>,
-    #[serde(alias = "weekly_quota_reset_at_unix")]
+    #[serde(alias = "weekly_quota_reset_at_unix", default, deserialize_with = "de_opt_num")]
     weekly_quota_reset_at_unix: Option<i64>,
-    #[serde(alias = "acu_consumed")]
+    #[serde(alias = "acu_consumed", default, deserialize_with = "de_opt_num")]
     acu_consumed: Option<f64>,
-    #[serde(alias = "acu_limit")]
+    #[serde(alias = "acu_limit", default, deserialize_with = "de_opt_num")]
     acu_limit: Option<f64>,
 }
 
@@ -75,6 +102,29 @@ fn resolve_credentials_path() -> Option<PathBuf> {
         .map(PathBuf::from)
         .or_else(|| dirs::home_dir().map(|h| h.join(".local").join("share")))?;
     Some(base.join("devin").join("credentials.toml"))
+}
+
+fn devin_data_dir() -> Option<PathBuf> {
+    resolve_credentials_path().and_then(|p| p.parent().map(|d| d.to_path_buf()))
+}
+
+/// The newest Devin CLI version installed under `<data>/cli/_versions/`.
+fn installed_cli_version() -> String {
+    devin_data_dir()
+        .and_then(|d| std::fs::read_dir(d.join("cli").join("_versions")).ok())
+        .map(|entries| {
+            entries
+                .filter_map(|e| e.ok()?.file_name().into_string().ok())
+                .filter(|n| n.chars().next().is_some_and(|c| c.is_ascii_digit()))
+                .max_by(|a, b| compare_versions(a, b))
+        })
+        .flatten()
+        .unwrap_or_else(|| FALLBACK_CLI_VERSION.to_string())
+}
+
+fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
+    let parse = |s: &str| -> Vec<u64> { s.split('.').map(|p| p.parse().unwrap_or(0)).collect() };
+    parse(a).cmp(&parse(b))
 }
 
 fn parse_credentials(toml_text: &str) -> Option<(String, String)> {
@@ -172,31 +222,54 @@ pub async fn fetch_devin_quota(agent_type: &str) -> Result<AgentQuotaInfo, Strin
         .timeout(std::time::Duration::from_secs(10))
         .build()
         .map_err(|e| format!("failed to initialize HTTP client: {e}"))?;
-    let body = serde_json::json!({
-        "metadata": {
-            "api_key": api_key,
-            "ide_name": "devin-cli",
-            "ide_version": "codeg",
-            "extension_version": "codeg",
+    // The seat-management server validates the client identity in the
+    // request metadata and answers 500 for one it does not recognise. Devin
+    // CLI identifies as extension "chisel" at its own installed version, so
+    // send that; a couple of known-good identities follow as fallbacks in
+    // case the server's expectations move.
+    let version = installed_cli_version();
+    let mut last_error = String::new();
+    let mut text = None;
+    for (ide_name, extension_name) in CLIENT_IDENTITIES {
+        let body = serde_json::json!({
+            "metadata": {
+                "api_key": api_key,
+                "ide_name": ide_name,
+                "ide_version": version,
+                "extension_name": extension_name,
+                "extension_version": version,
+                "locale": "en",
+            }
+        });
+        let response = client
+            .post(format!("{server}{GET_USER_STATUS_PATH}"))
+            .header("Content-Type", "application/json")
+            .header("Connect-Protocol-Version", "1")
+            .header("User-Agent", format!("{extension_name}/{version}"))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("Devin status API request failed: {e}"))?;
+        let status = response.status();
+        let payload = response
+            .text()
+            .await
+            .map_err(|e| format!("failed to read Devin status payload: {e}"))?;
+        if status.is_success() {
+            text = Some(payload);
+            break;
         }
-    });
-    let response = client
-        .post(format!("{server}{GET_USER_STATUS_PATH}"))
-        .header("Content-Type", "application/json")
-        .header("Connect-Protocol-Version", "1")
-        .header("User-Agent", "codeg")
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("Devin status API request failed: {e}"))?;
-    let status = response.status();
-    if !status.is_success() {
-        return Err(format!("Devin status API returned HTTP {status}"));
+        // Connect errors carry `{"code","message"}` — safe to surface, and
+        // far more useful than a bare status line.
+        let detail: String = payload.chars().take(200).collect();
+        last_error = format!("Devin status API returned HTTP {status}: {detail}");
+        if status.as_u16() == 401 || status.as_u16() == 403 {
+            break;
+        }
     }
-    let text = response
-        .text()
-        .await
-        .map_err(|e| format!("failed to read Devin status payload: {e}"))?;
+    let Some(text) = text else {
+        return Err(last_error);
+    };
     parse_devin_status_json(&text, agent_type, now)
 }
 
@@ -244,6 +317,27 @@ mod tests {
         assert!(info.plan_name.is_none());
         let empty = parse_devin_status_json("{}", "devin", now).unwrap();
         assert!(empty.short_window.is_none() && empty.weekly_window.is_none());
+    }
+
+    #[test]
+    fn accepts_int64_as_string() {
+        let now = Utc.with_ymd_and_hms(2026, 9, 27, 12, 0, 0).unwrap();
+        let raw = r#"{"userStatus":{"planStatus":{"dailyQuotaRemainingPercent":50,
+            "dailyQuotaResetAtUnix":"1790755200","acuConsumed":"3.5","acuLimit":"100"}}}"#;
+        let info = parse_devin_status_json(raw, "devin", now).unwrap();
+        let daily = info.short_window.unwrap();
+        assert_eq!(daily.resets_at.unwrap().timestamp(), 1_790_755_200);
+        assert_eq!(info.plan_name.as_deref(), Some("3.5 / 100 ACU"));
+    }
+
+    #[test]
+    fn versions_compare_numerically() {
+        use std::cmp::Ordering;
+        assert_eq!(
+            compare_versions("3000.11.3", "3000.9.12"),
+            Ordering::Greater
+        );
+        assert_eq!(compare_versions("1.2", "1.2.0"), Ordering::Less);
     }
 
     #[test]
