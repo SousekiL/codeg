@@ -16,6 +16,17 @@ use crate::models::AgentQuotaInfo;
 /// Default time-to-live for cached quota information (30 seconds).
 pub const DEFAULT_QUOTA_TTL: Duration = Duration::from_secs(30);
 
+/// Anthropic's usage endpoint rate-limits hard; a 30s refresh earns 429s.
+const CLAUDE_QUOTA_TTL: Duration = Duration::from_secs(300);
+
+fn ttl_for(agent_type: &str, default: Duration) -> Duration {
+    if agent_type == claude::CLAUDE_AGENT_TYPE {
+        CLAUDE_QUOTA_TTL
+    } else {
+        default
+    }
+}
+
 /// Centralized manager for querying and caching agent quotas.
 #[derive(Debug, Clone)]
 pub struct QuotaManager {
@@ -79,14 +90,49 @@ impl QuotaManager {
 
     /// Get quota for an agent. Returns cached info if valid; otherwise fetches fresh info.
     pub async fn get_quota(&self, agent_type: &str) -> Result<AgentQuotaInfo, String> {
-        if let Some(cached) = self.get_cached(agent_type).await {
+        if let Some(cached) = self
+            .get_cached_within(agent_type, ttl_for(agent_type, self.ttl))
+            .await
+        {
             return Ok(cached);
         }
         self.fetch_quota(agent_type).await
     }
 
+    async fn get_cached_within(&self, agent_type: &str, ttl: Duration) -> Option<AgentQuotaInfo> {
+        let cache = self.cache.read().await;
+        cache
+            .get(agent_type)
+            .filter(|(_, at)| at.elapsed() < ttl)
+            .map(|(info, _)| info.clone())
+    }
+
+    /// The last value ever fetched for `agent_type`, however old.
+    async fn get_last_known(&self, agent_type: &str) -> Option<AgentQuotaInfo> {
+        self.cache
+            .read()
+            .await
+            .get(agent_type)
+            .map(|(info, _)| info.clone())
+    }
+
     /// Fetch fresh quota from the respective agent backend and cache it.
     pub async fn fetch_quota(&self, agent_type: &str) -> Result<AgentQuotaInfo, String> {
+        match self.fetch_quota_uncached(agent_type).await {
+            Ok(info) => {
+                self.cache_quota(agent_type, info.clone()).await;
+                Ok(info)
+            }
+            // A failed refresh (rate limit, network blip) keeps showing the last
+            // good figures instead of replacing them with an error.
+            Err(err) => match self.get_last_known(agent_type).await {
+                Some(stale) => Ok(stale),
+                None => Err(err),
+            },
+        }
+    }
+
+    async fn fetch_quota_uncached(&self, agent_type: &str) -> Result<AgentQuotaInfo, String> {
         let info = match agent_type {
             "codex" => self.fetch_codex_quota().await?,
             "antigravity" => self.fetch_antigravity_quota().await?,
@@ -101,7 +147,6 @@ impl QuotaManager {
             }
         };
 
-        self.cache_quota(agent_type, info.clone()).await;
         Ok(info)
     }
 
