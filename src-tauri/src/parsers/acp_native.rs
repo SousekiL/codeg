@@ -30,7 +30,7 @@
 //! notifications), so there the boundary falls back to "a user message chunk
 //! starts a new turn" — which is exactly how the replay is structured.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, TimeZone, Utc};
@@ -279,6 +279,11 @@ struct PendingTurn {
     /// Index of each tool call's `ToolResult`, appended on first output.
     tool_result_index: HashMap<String, usize>,
     usage: Option<TurnUsage>,
+    /// Per-call token counts an agent reports in `usage_update._meta` (Devin:
+    /// `cognition.ai/*`), summed over the turn. Used when no turn-end `usage`
+    /// arrives; `vendor_calls_seen` drops the same call reported twice.
+    vendor_usage: Option<TurnUsage>,
+    vendor_calls_seen: HashSet<(u64, u64, u64, u64)>,
     duration_ms: Option<u64>,
     model: Option<String>,
     has_content: bool,
@@ -436,6 +441,9 @@ pub fn project_turns(entries: &[TranscriptEntry]) -> Vec<MessageTurn> {
                 user_prose_open = false;
             }
             EntryKind::Update => {
+                if let Some(p) = pending.as_mut() {
+                    add_vendor_call_usage(p, &entry.p);
+                }
                 // Deserialized from a BORROWED `&Value`, not a cloned one: this
                 // runs once per recorded chunk, and a long conversation records
                 // tens of thousands, so cloning each payload only to drop it a
@@ -475,7 +483,7 @@ fn flush(pending: &mut Option<PendingTurn>, turns: &mut Vec<MessageTurn>, seq: &
         role: TurnRole::Assistant,
         blocks: p.blocks,
         timestamp: epoch_ms_to_utc(p.started_at_ms),
-        usage: p.usage,
+        usage: p.usage.or(p.vendor_usage),
         duration_ms: p
             .duration_ms
             .or_else(|| p.last_at_ms.checked_sub(p.started_at_ms)),
@@ -500,6 +508,39 @@ fn apply_turn_end(pending: &mut PendingTurn, payload: &serde_json::Value) {
             pending.usage = Some(parsed);
         }
     }
+}
+
+/// Devin reports each model call's tokens in its `usage_update` as
+/// `_meta["cognition.ai/*Tokens"]`, where `inputTokens` INCLUDES the cached
+/// reads and writes. The same call is often sent twice (once more tagged with
+/// `cognition.ai/subagent_context`), so identical counts within a turn count
+/// once; a genuine sub-agent call has its own counts and is kept.
+fn add_vendor_call_usage(pending: &mut PendingTurn, payload: &serde_json::Value) {
+    if payload.get("sessionUpdate").and_then(|v| v.as_str()) != Some("usage_update") {
+        return;
+    }
+    let Some(meta) = payload.get("_meta") else { return };
+    let get = |key: &str| meta.get(key).and_then(|v| v.as_u64());
+    let Some(input) = get("cognition.ai/inputTokens") else { return };
+    let output = get("cognition.ai/outputTokens").unwrap_or(0);
+    let cache_read = get("cognition.ai/cachedReadTokens").unwrap_or(0);
+    let cache_write = get("cognition.ai/cachedWriteTokens").unwrap_or(0);
+    if !pending
+        .vendor_calls_seen
+        .insert((input, output, cache_read, cache_write))
+    {
+        return;
+    }
+    let sum = pending.vendor_usage.get_or_insert(TurnUsage {
+        input_tokens: 0,
+        output_tokens: 0,
+        cache_creation_input_tokens: 0,
+        cache_read_input_tokens: 0,
+    });
+    sum.input_tokens += input.saturating_sub(cache_read + cache_write);
+    sum.output_tokens += output;
+    sum.cache_read_input_tokens += cache_read;
+    sum.cache_creation_input_tokens += cache_write;
 }
 
 /// Read an ACP usage object. Field names follow the `unstable_session_usage`
@@ -1601,6 +1642,40 @@ mod tests {
                 "whitelist and projection disagree about {payload}"
             );
         }
+    }
+
+    #[test]
+    fn devin_vendor_usage_sums_per_call_counts_once() {
+        let call = |input: u64, output: u64, read: u64, write: u64, sub: bool| {
+            let mut meta = serde_json::json!({
+                "cognition.ai/inputTokens": input,
+                "cognition.ai/outputTokens": output,
+                "cognition.ai/cachedReadTokens": read,
+                "cognition.ai/cachedWriteTokens": write,
+            });
+            if sub {
+                meta["cognition.ai/subagent_context"] = serde_json::json!({"parentAgentId": "root"});
+            }
+            serde_json::json!({"sessionUpdate": "usage_update", "used": input, "size": 1_000_000, "_meta": meta})
+        };
+        let entries = vec![
+            prompt(1, "hi"),
+            update(2, text_chunk("agent_message_chunk", "working")),
+            update(3, call(100, 10, 0, 90, false)),
+            update(3, call(100, 10, 0, 90, true)), // same call, sent twice
+            update(4, call(200, 20, 90, 100, false)),
+            update(5, call(50, 5, 0, 0, true)), // a real sub-agent call
+            prompt(6, "next"),
+            update(7, text_chunk("agent_message_chunk", "ok")),
+        ];
+        let turns = project_turns(&entries);
+        let first = turns[1].usage.as_ref().expect("usage summed");
+        assert_eq!(first.cache_read_input_tokens, 90);
+        assert_eq!(first.cache_creation_input_tokens, 190);
+        // (100-0-90) + (200-90-100) + 50
+        assert_eq!(first.input_tokens, 70);
+        assert_eq!(first.output_tokens, 35);
+        assert!(turns[3].usage.is_none(), "a turn with no usage reports stays empty");
     }
 
     #[test]
