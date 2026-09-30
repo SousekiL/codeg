@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next"
 import "katex/dist/katex.min.css"
 import "./globals.css"
+import "./personal-polish.css"
 import { NextIntlClientProvider } from "next-intl"
 import { AppI18nProvider } from "@/components/i18n-provider"
 import { getMessagesForLocale } from "@/i18n/messages"
